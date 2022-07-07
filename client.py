@@ -21,12 +21,12 @@ def get_pg_connection():
     return create_engine(f'postgresql://{PG_LOGIN}:{PG_PASSWORD}@localhost:5432/{PG_DB}')
 
 
-def check_login_correctness(login, password):
+def check_login_correctness(login, password,form_object):
     with get_pg_connection().connect() as engine:
         query = text("SELECT * FROM user_data WHERE login=:x and password=:y")
         user = engine.execute(query, x=login, y=password).first()
         if not user:  # todo make out of loop by form
-            print('Wrong login or password')
+            form_object.incorrect_data_popup()
             return True  # not correct
         else:
             return False  # correct
@@ -63,7 +63,7 @@ def create_new_user(new_login, new_password,form_object):
                         client_id serial);""")
 
         if not re.match(r'^\D[\d\w]{3,}$', new_login):
-            print('invalid login, try again')
+            form_object.incorrect_login_popup()
         else:
             try:
                 query = text("""
@@ -71,8 +71,9 @@ def create_new_user(new_login, new_password,form_object):
                 (:x,:y);""")
                 engine.execute(query, x=new_login, y=new_password)
             except IntegrityError:
-                print('This login is already used, try again')
-    form_object.user_created()
+                form_object.login_exists_popup()
+            else:
+                form_object.user_created_popup()
 
 
 class Client(protocol.Protocol):
