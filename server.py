@@ -12,7 +12,7 @@ PG_DB = os.environ.get('POSTGRES_DB')
 
 
 def get_pg_connection():
-    return create_engine(f'postgresql://{PG_LOGIN}:{PG_PASSWORD}@localhost:5432/{PG_DB}')
+    return create_engine(f'postgresql://{PG_LOGIN}:{PG_PASSWORD}@database:5432/{PG_DB}')
 
 
 class Server(protocol.Protocol):
@@ -57,7 +57,19 @@ class Server(protocol.Protocol):
             if not self.another_client:
                 self.send_message(value='Dont have a client', type='error')
             try:
-                self.send_message(value=data['value'], client=self.clients[self.another_client],type='new_message')
+                with get_pg_connection().connect() as engine:
+                    self.send_message(value=data['value'], client=self.clients[self.another_client],type='new_message')
+                    message_table_query = text("""CREATE TABLE IF NOT EXISTS message(
+                        message_id serial primary key,
+                        from_user int not null,
+                        to_user int not null,
+                        message_value varchar
+                        );
+                        INSERT INTO message(from_user, to_user, message_value) VALUES (:from_user,:to_user,:val);""")
+                    engine.execute(message_table_query,
+                                   from_user=self.my_identifier,
+                                   to_user=self.clients[self.another_client],
+                                   val=data['value'])
             except KeyError:
                 self.send_message(value='try another client',type='error')
                 self.another_client = None
@@ -86,11 +98,11 @@ class ServerFactory(ServerFactoryImported):
         self.clients = {}
         self.last_id = 0
 
-    def buildProtocol(self, addr): #TODO CHECK IF SERVER CREATES CONNECTION FIRST OR SECOND
+    def buildProtocol(self, addr):
         self.last_id += 1
         with get_pg_connection().connect() as engine:
             engine.execute("ALTER TABLE user_data ADD COLUMN IF NOT EXISTS id int;")
-            query = text("UPDATE user_data SET id=:x where id is null")
+            query = text("UPDATE user_data SET id=:x where id is null;")
             engine.execute(query, x=self.last_id)
         return Server(self.clients, self.last_id)
 

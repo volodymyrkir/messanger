@@ -8,7 +8,7 @@ from twisted.internet.protocol import ReconnectingClientFactory as ClientFactory
 from twisted.internet.endpoints import TCP4ClientEndpoint
 from sqlalchemy.engine import create_engine
 from sqlalchemy.sql import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,41 +21,27 @@ def get_pg_connection():
     return create_engine(f'postgresql://{PG_LOGIN}:{PG_PASSWORD}@localhost:5432/{PG_DB}')
 
 
-def check_login_correctness(login, password,form_object):
+def check_login_correctness(login, password, another_user, form_object):
     with get_pg_connection().connect() as engine:
         query = text("SELECT * FROM user_data WHERE login=:x and password=:y")
-        user = engine.execute(query, x=login, y=password).first()
-        if not user:  # todo make out of loop by form
+        try:
+            user = engine.execute(query, x=login, y=password).first()
+        except ProgrammingError:
             form_object.incorrect_data_popup()
-            return True  # not correct
         else:
-            return False  # correct
+            if not user:
+                form_object.incorrect_data_popup()
+            else:
+                another_query = text("SELECT * FROM user_data WHERE login=:x")
+                another_user = engine.execute(another_query, x=another_user).first()
+                if not another_user:
+                    form_object.incorrect_data_popup(True)
+                else:
+                    another_user_id = another_user[2]
+                    form_object.login_successful(login, Client(), another_user_id)  # enter in chat
 
 
-# def create_new_user():
-#     condition = True
-#     with get_pg_connection().connect() as engine:
-#         engine.execute("""CREATE TABLE IF NOT EXISTS user_data(
-#                         login varchar(255) not null primary key,
-#                         password varchar(255) not null,
-#                         client_id serial);""")
-#         while condition:
-#             new_login = input('new login:')
-#             new_password = input('new password:')
-#             if not re.match(r'^\D[\d\w]{3,}$', new_login):
-#                 print('invalid login, try again')
-#             else:
-#                 try:
-#                     query = text("""
-#                     INSERT INTO user_data(LOGIN, PASSWORD) VALUES
-#                     (:x,:y);""")
-#                     engine.execute(query, x=new_login, y=new_password)
-#                 except IntegrityError:
-#                     print('This login is already used, try again')
-#                 else:
-#                     condition = False
-
-def create_new_user(new_login, new_password,form_object):
+def create_new_user(new_login, new_password, form_object):
     with get_pg_connection().connect() as engine:
         engine.execute("""CREATE TABLE IF NOT EXISTS user_data(
                         login varchar(255) not null primary key,
@@ -78,11 +64,6 @@ def create_new_user(new_login, new_password,form_object):
 
 class Client(protocol.Protocol):
     def __init__(self):
-        condition = True
-        while condition:
-            login = input('Enter login:')
-            password = input('Enter password:')
-            condition = check_login_correctness(login, password)
         reactor.callInThread(self.message_input)
 
     @staticmethod
@@ -93,6 +74,8 @@ class Client(protocol.Protocol):
         self.transport.write(self.__encode_json(**kwargs).encode('utf-8'))
 
     def message_input(self):
+        self.send_message(value=2, type='user_choose')
+        self.send_message(value='hi', type='new_message')
         while True:
             self.send_message(value=input('value:'), type=input('type:'))
 
@@ -118,8 +101,7 @@ class ClientFactory(ClientFactoryImported):
     def buildProtocol(self, addr):
         return Client()
 
-
-if __name__ == "__main__":
+if __name__=="__maim__":
     endpoint = TCP4ClientEndpoint(reactor, 'localhost', 8000)
     endpoint.connect(ClientFactory())
     reactor.run()
