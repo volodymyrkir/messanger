@@ -28,7 +28,8 @@ class InterfaceManager(BoxLayout):
 
     def show_chat(self, login, client, another_user_id):
         self.clear_widgets()
-        self.add_widget(ChatPage(login, client, another_user_id))
+        chat_page = ChatPage(login, client, another_user_id)
+        self.add_widget(chat_page)
 
 
 class MessangerApp(App):

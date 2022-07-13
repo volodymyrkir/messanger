@@ -74,8 +74,6 @@ class Client(protocol.Protocol):
         self.transport.write(self.__encode_json(**kwargs).encode('utf-8'))
 
     def message_input(self):
-        self.send_message(value=2, type='user_choose')
-        self.send_message(value='hi', type='new_message')
         while True:
             self.send_message(value=input('value:'), type=input('type:'))
 
@@ -101,7 +99,8 @@ class ClientFactory(ClientFactoryImported):
     def buildProtocol(self, addr):
         return Client()
 
-if __name__=="__maim__":
+
+if __name__ == "__main__":
     endpoint = TCP4ClientEndpoint(reactor, 'localhost', 8000)
     endpoint.connect(ClientFactory())
     reactor.run()

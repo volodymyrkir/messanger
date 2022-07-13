@@ -19,11 +19,11 @@ class RegisterForm(GridLayout):
         self.password = TextInput(multiline=False, font_size=45, hint_text='Your password', password=True)
         self.add_widget(self.password)
 
-        self.submit = Button(text='Create account', font_size=40,
+        self.submit = Button(text='Create account', font_size=40, background_color=(1, 0, 0, 0.8),
                              on_press=lambda *args: create_new_user(self.login.text, self.password.text, self))
         self.add_widget(self.submit)
 
-        self.get_back_button = Button(text='Back to login', font_size=40)
+        self.get_back_button = Button(text='Back to login', font_size=40,background_color=(0, 1, 0, 0.9))
         self.add_widget(self.get_back_button)
 
     def user_created_popup(self):

@@ -36,6 +36,7 @@ class ChatPage(GridLayout):
         super().__init__(**kwargs)
         self.user_name = user_name
         self.client = client
+
         self.another_user_id = another_user_id
         self.cols = 1
         self.rows = 2

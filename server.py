@@ -5,14 +5,16 @@ from twisted.internet.protocol import ServerFactory as ServerFactoryImported, co
 from twisted.internet.endpoints import TCP4ServerEndpoint
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
+from dotenv import load_dotenv
 
+load_dotenv()
 PG_LOGIN = os.environ.get('POSTGRES_USER')
 PG_PASSWORD = os.environ.get('POSTGRES_PASSWORD')
 PG_DB = os.environ.get('POSTGRES_DB')
 
 
 def get_pg_connection():
-    return create_engine(f'postgresql://{PG_LOGIN}:{PG_PASSWORD}@database:5432/{PG_DB}')
+    return create_engine(f'postgresql://{PG_LOGIN}:{PG_PASSWORD}@localhost:5432/{PG_DB}')
 
 
 class Server(protocol.Protocol):
@@ -26,7 +28,7 @@ class Server(protocol.Protocol):
 
     def dataReceived(self, data: bytes):
         try:
-            data = json.loads(data.decode('utf-8')) #server
+            data = json.loads(data.decode('utf-8'))  # server
         except UnicodeDecodeError:
             self.send_message(value='Cannot decode, use utf-8', type='error')
             return
@@ -48,17 +50,18 @@ class Server(protocol.Protocol):
                     raise KeyError
                 self.another_client = another_client
             except ValueError:
-                self.send_message(value='Write id as integer',type='error')
+                self.send_message(value='Write id as integer', type='error')
             except KeyError:
-                self.send_message(value=f'Can not find client no {another_client}',  type='error')
+                self.send_message(value=f'Can not find client no {another_client}', type='error')
             else:
-                self.send_message(value=f'Established connection with client #{self.another_client}',type='user_chosen')
+                self.send_message(value=f'Established connection with client #{self.another_client}',
+                                  type='user_chosen')
         elif data['type'] == "new_message":
             if not self.another_client:
                 self.send_message(value='Dont have a client', type='error')
             try:
                 with get_pg_connection().connect() as engine:
-                    self.send_message(value=data['value'], client=self.clients[self.another_client],type='new_message')
+                    self.send_message(value=data['value'], client=self.clients[self.another_client], type='new_message')
                     message_table_query = text("""CREATE TABLE IF NOT EXISTS message(
                         message_id serial primary key,
                         from_user int not null,
@@ -68,10 +71,10 @@ class Server(protocol.Protocol):
                         INSERT INTO message(from_user, to_user, message_value) VALUES (:from_user,:to_user,:val);""")
                     engine.execute(message_table_query,
                                    from_user=self.my_identifier,
-                                   to_user=self.clients[self.another_client],
+                                   to_user=self.clients[self.another_client].my_identifier,
                                    val=data['value'])
             except KeyError:
-                self.send_message(value='try another client',type='error')
+                self.send_message(value='try another client', type='error')
                 self.another_client = None
 
     def disconnect(self):
@@ -99,8 +102,8 @@ class ServerFactory(ServerFactoryImported):
         self.last_id = 0
 
     def buildProtocol(self, addr):
-        self.last_id += 1
-        with get_pg_connection().connect() as engine:
+        self.last_id+=1
+        with get_pg_connection().connect() as engine:    # коммент если терминальная версия
             engine.execute("ALTER TABLE user_data ADD COLUMN IF NOT EXISTS id int;")
             query = text("UPDATE user_data SET id=:x where id is null;")
             engine.execute(query, x=self.last_id)
