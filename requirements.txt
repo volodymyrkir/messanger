@@ -1,0 +1,4 @@
+twisted==22.4.0
+sqlalchemy
+psycopg2-binary
+python-dotenv
